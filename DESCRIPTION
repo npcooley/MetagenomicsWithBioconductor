@@ -1,28 +1,31 @@
-Package: BuildABiocWorkshop
-Title: Bioconductor or R Workshop Template and Github Actions
-Version: 2.0.1
+Package: MetagenomicsWithBioconductor
+Title: An introduction to working with metagenomics data
+Version: 1.0.0
 Authors@R: 
-    person(given = "Sean",
-           family = "Davis",
+    person(given = "Nick",
+           family = "Cooley",
            role = c("aut", "cre"),
-           email = "seandavi@gmail.com",
-           comment = c(ORCID = "0000-0002-8991-6458"))
-Description: This package serves as a template for using github actions to 
-    prepare a Bioconductor Workshop package for use. In particular,
-    a pkgdown website and docker image are generated based on workflow 
-    settings. 
+           email = "nicholas.cooley@ul.ie",
+           comment = c(ORCID = "0000-0002-6029-304X"))
+Description: This package is a workshop showing how to use Bioconductor packages to work with metagenomics data.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.0
 Depends: 
-    Biobase
+    MGnifyR,
+    mia,
+    miaViz,
+    scater,
+    UpSetR
 Suggests: 
     knitr,
     rmarkdown,
-    pkgdown
-URL: https://seandavi.github.io/BuildABiocWorkshop/
-BugReports: https://github.com/seandavi/BuildABiocWorkshop/issues/new/choose
+    pkgdown,
+    ComplexHeatmap,
+    vegan
+URL: https://npcooley.github.io/MetagenomicsWithBioconductor/
+BugReports: https://github.com/npcooley/MetagenomicsWithBioconductor/issues/
 VignetteBuilder: knitr
-DockerImage: ghcr.io/seandavi/buildabiocworkshop:latest
+DockerImage: ghcr.io/npcooley/metagenomicswithbioconductor:latest

@@ -1,0 +1,757 @@
+---
+title: "Metagenomics with Bioconductor"
+author: Nick Cooley^[nicholas.cooley@ul.ie]
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Metagenomics with Bioconductor}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+# Overview
+
+**This workshop has been written for data science students who have a strong background in informatics and R, but little background in computational biology.**
+
+[Bioconductor](https://www.bioconductor.org/) has a mature and diverse set of tools for working with metagenomic data. This workshop will cover a small segment of them. Metagenomics data comes in two distinct flavors; shotgun sequencing and amplicon sequencing.
+
+Amplicon sequencing (sometimes referred to as barcoding or metabarcoding) involves isolating and sequencing a single phylogenetic marker gene from a sample. This technique surveys the diversity of organisms present in a sample (that have that marker gene). Amplicon sequencing is an inexpensive way to survey *who* is present in a sample, but it says little directly about what those organisms can do.
+
+Shotgun sequencing involves sequencing all available DNA from a given sample and building a metagenomic assembly from those sequencing reads. This metagenomic assembly captures genes and local gene neighborhoods, providing more detail than just a survey of marker genes. Shotgun sequencing of metagenomes is what allows us to probe for antibiotic resistance genes and markers identifying community capabilities, as opposed to just community composition.
+
+This workshop will focus on data produced by shotgun sequencing, though some parts of it will be applicable to amplicon data.
+
+## Workshop information
+
+**Learning goals.** By the end of this workshop you should be able to:
+
+- describe how MGnify results are organised in a `MultiAssayExperiment`;
+- explore taxonomic composition, diversity, and between-sample differences;
+- explore functional profiles (GO-slim, GO terms, InterPro) and explain why
+  their resolution matters;
+- compare taxonomic and functional views of the same samples.
+
+**Prerequisites.** Basic R; some familiarity with `SummarizedExperiment`-style objects is helpful but not required.
+
+**Packages used.** `MGnifyR`, `MultiAssayExperiment`, `TreeSummarizedExperiment`, `mia`, `miaViz`, `scater`, `ComplexHeatmap`, `vegan`, `ggplot2`.
+
+## How does the data get here
+
+Sequencing experiments rely on a complex stack of chemistry, engineering, and bioinformatics. The basic data collection and initial data handling are going to be dependent upon the sequencing *technology* chosen. The three major technology providers are [Illumina](https://www.illumina.com/areas-of-interest/microbiology/microbial-sequencing-methods/shotgun-metagenomic-sequencing.html), [PacBio](https://www.pacb.com/products-and-services/applications/complex-populations/microbial/), and [Oxford Nanopore](https://nanoporetech.com/applications/techniques/metagenomics-and-microbiome-analysis-with-nanopore-technology). Illumina data is sometimes colloquially referred to as short-read, while PacBio and Oxford Nanopore are colloquially referred to as long-read.
+
+A majority of the data present in public repositories comes from Illumina.
+
+## Description and Data
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE,
+                      comment = "#>",
+                      fig.width = 7,
+                      fig.height = 4.5,
+                      message = FALSE)
+# just in case, we're using cached data though
+options(timeout = 600)
+```
+
+In this workshop we will work with `MGnify` data using the `MGnifyR` package to introduce metagenomics data structures, how to work with them, and what kinds of applications they can be used for. [MGnify](https://www.ebi.ac.uk/metagenomics/) is a public repository of metagenomics data from environmental sources, to waste water, to clinical samples. The [MGnifyR](https://bioconductor.org/packages/release/bioc/html/MGnifyR.html) package provides tools for accessing that data. The data this code chunk collects is already cached in this workshop, so workshop participants don't need to run this code themselves. The data pulled from `MGnify` here is already cached in this workshop, so we don't need this code chunk below. If you want to use this as a template for other `MGnify` data, this will help you get it.
+
+```{r, eval = FALSE}
+library(MGnifyR)
+# increase R's default timeout limit of server calls, just because
+options(timeout = 600)
+# use a cache in R's temp directory
+mg <- MgnifyClient(useCache = TRUE,
+                   cacheDir = file.path(tempdir(),
+                                        "MGnifyR_cache"))
+
+# danish waste water collection study from copenhagen
+study_id <- "MGYS00001135"
+
+analysis_ids <- searchAnalysis(mg, "studies", study_id)
+
+# if you haven't changed R's default timeout option, this may complain
+analysis_meta_data <- getMetadata(x = mg,
+                                  accession = analysis_ids)
+
+# this is an idiomatic call to tapply; without specifying `FUN`
+# tapply will return integer ids for the shared factor combinations,
+# in this case, latitute and longitude
+# it can contain NAs when NAs are present in a supplied INDEX
+sample_locations <- tapply(X = analysis_meta_data,
+                           INDEX = list(analysis_meta_data$`sample_geographic location (longitude)`,
+                                        analysis_meta_data$`sample_geographic location (latitude)`))
+
+# metadata can be messy, we know ahead of time that this data can contain NAs,
+# but this is a form you would use to check if you didn't
+# know that ahead of time
+# any(is.na(analysis_meta_data$`sample_geographic location (latitude)`))
+# any(is.na(analysis_meta_data$`sample_geographic location (longitude)`))
+
+# we want to select the sampling location with the fewest samples, for simplicity
+# table the sample location index, find the lowest value, get the name
+# that in this case is just an integer
+w1 <- as.integer(names(which.min(table(sample_locations))))
+
+# which() manages NAs for us
+analysis_subset <- analysis_meta_data[which(sample_locations == w1), ]
+
+# getting a single tree summarized experiment
+tse <- getResult(x = mg,
+                 accession = analysis_subset[["analysis_accession"]][1],
+                 get.func = FALSE)
+
+# getting a multiassayexperiment containing the tses for several accessions
+mse <- getResult(x = mg,
+                 accession = analysis_subset[["analysis_accession"]])
+```
+
+We can access MGnify data either through generic R accessors and tools, or through the `MGnifyR` package and the miaverse family of packages. MGnify provides a [small example code snippet](https://docs.mgnify.org/src/examples/r.html) for how the former looks. We can also write up our own versions of this.
+
+```{r, eval = FALSE}
+library(jsonlite)
+# we can interact with resource APIs through the 'jsonlite' package
+API <- "https://www.ebi.ac.uk/metagenomics/api/v2"
+# data from a survey of waste water in Copenhagen
+STUDY <- "MGYS00001135"
+
+# a simple helper function
+get_json <- function(path) {
+  file <- tempfile()
+  on.exit(unlink(file))
+  download.file(paste0(API,
+                       "/",
+                       path),
+                file,
+                quiet = TRUE)
+  res <- fromJSON(file)
+  return(res)
+}
+
+# get our up front meta data on a selected study
+study <- get_json(paste0("studies/",
+                         STUDY))
+
+ANALYSIS <- analyses$accession[1]
+analysis <- get_json(paste0("analyses/",
+                            ANALYSIS))
+
+# this is a list of all downloadable files from the selected study
+downloads <- as.data.frame(analysis$downloads)
+
+# get the OTU table in tsv format
+w1 <- which(downloads$file_type == "tsv" &
+              grepl(pattern = "OTUs",
+                    x = downloads$short_description))
+
+if (length(w1) > 0) {
+  # grab w1[1], just in case we get multiple hits
+  target_url <- downloads$url[w1[1]]
+  tmp01 <- tempfile(fileext = ".tsv.gz")
+  download.file(target_url,
+                tmp01,
+                quiet = TRUE,
+                mode = "wb")
+  raw_tax_table <- try(read.table(file = tmp01,
+                                  header = FALSE,
+                                  comment.char = "#",
+                                  sep = "\t"))
+}
+```
+
+An advantage of knowing how to interact with the API this way is that you can interact with MGnify data in minimal dependency environments, or in places where you may not be able to control what packages you have access to. It can also give you an understanding of what the data *actually* looks like under the hood. A disadvantage of this approach is foregoing the use of the helpers present in the `miaverse`.
+
+# Exploring the data
+
+```{r}
+suppressMessages(library(MultiAssayExperiment))
+suppressMessages(library(TreeSummarizedExperiment))
+suppressMessages(library(mia))
+suppressMessages(library(miaViz))
+suppressMessages(library(scater))
+suppressMessages(library(UpSetR))
+suppressMessages(library(ComplexHeatmap))
+
+# get the absolute path to our workshop data
+data_path <- system.file("extdata", "workshop_data.RData",
+                         package = "MetagenomicsWithBioconductor",
+                         mustWork = TRUE)
+
+# load the data
+load(data_path, verbose = TRUE)
+
+names(mse)
+
+# show which accessions have which experiments
+upsetSamples(mse)
+```
+
+For this workshop and for a lot of modern `MGnify` data upset plots won't be particularly interesting. However they can be very useful for metastudies, managing comparisons across experimental regimes, or across time periods that span technology generations.
+
+The data we pull from `MGnify` will be of class `MultiAssayExperiment`. In most cases, we will break that into the `TreeSummarizedExperiment` objects that compose it. The data inside can be accessed with accessors like `assay()`, `colData()`, and `rowData()`. Sometimes that data can be a bit messy, so helper functions like the `clean_counts()` function below helps us manage where `NAs` can appear in it.
+
+```{r}
+# break out by experiment type
+tse_tax <- getWithColData(x = mse,
+                          i = "Taxonomic analysis")
+tse_go_slim <- getWithColData(x = mse,
+                              i = "go-slim")
+tse_go_terms <- getWithColData(x = mse,
+                               i = "go-terms")
+tse_interpro <- getWithColData(x = mse,
+                               i = "interpro-identifiers")
+
+clean_counts <- function(x,
+                         label,
+                         assay.type = "counts") {
+  counts <- as.matrix(assay(x, assay.type))
+
+  # 1. Samples with no values at all have no result of this type: drop them
+  all_missing <- colSums(!is.na(counts)) == 0L
+  if (any(all_missing)) {
+    message(label, ": dropping ", sum(all_missing),
+            " sample(s) with no results: ",
+            paste(colnames(x)[all_missing], collapse = ", "))
+    x <- x[, !all_missing]
+    counts <- counts[, !all_missing, drop = FALSE]
+  }
+
+  # 2. Within a sample, NA means "not reported", i.e. not detected: set to 0
+  n_na <- sum(is.na(counts))
+  if (n_na > 0L) {
+    message(label, ": treating ", n_na, " NA values (",
+            round(100 * n_na / length(counts), 1),
+            "% of entries) as zero, meaning not detected")
+    counts[is.na(counts)] <- 0
+  }
+
+  # 3. Drop features that are now zero in every remaining sample
+  absent <- rowSums(counts) == 0
+  if (any(absent)) {
+    message(label, ": dropping ", sum(absent), " feature(s) absent from all samples")
+    x <- x[!absent, ]
+    counts <- counts[!absent, , drop = FALSE]
+  }
+
+  # Keep only the cleaned counts; any other assay was computed from NA data
+  assays(x) <- S4Vectors::SimpleList(counts = counts)
+  return(x)
+}
+
+tse_tax <- clean_counts(tse_tax,
+                        "Taxonomic analysis")
+tse_go_slim <- clean_counts(tse_go_slim,
+                            "go-slim")
+tse_go_terms <- clean_counts(tse_go_terms,
+                             "go-terms")
+tse_interpro <- clean_counts(tse_interpro,
+                             "interpro-identifiers")
+
+```
+
+The experiments supplied differ in how many features they describe and how sparse they are. This can be as much of a function of analysis pipeline as it is the samples and experimental design. For `MGnify` data, an `analysis_pipeline.version` piece of metadata can tell us about the pipeline that was used to process the raw data.
+
+```{r experiment-summary}
+colData(mse)$analysis_pipeline.version
+
+summarise_experiment <- function(x, label) {
+  counts <- as.matrix(assay(x, "counts"))
+  data.frame(experiment = label,
+             features = nrow(counts),
+             samples = ncol(counts),
+             percent_zero = round(100 * mean(counts == 0), 1),
+             median_total_count = median(colSums(counts)))
+}
+
+experiment_summary <- rbind(
+  summarise_experiment(tse_tax, "Taxonomic analysis"),
+  summarise_experiment(tse_go_slim, "go-slim"),
+  summarise_experiment(tse_go_terms, "go-terms"),
+  summarise_experiment(tse_interpro, "interpro-identifiers")
+)
+knitr::kable(experiment_summary)
+```
+
+# Taxonomic profiles
+
+## Sequencing depth and richness
+
+The `mia` package contains a series of `addX()` functions that let us append analyses to our objects. `addMDS()` performs principle coordinate analysis on the assay passed to `assay.type` if a user supplied an incompatible assay and analysis combination, these functions should provide a meaningful error. `addAlpha()`, used below calculates the mean diversity of a sample.
+
+```{r tax-depth}
+tse_tax <- transformAssay(tse_tax,
+                          assay.type = "counts",
+                          method = "relabundance")
+tse_tax <- addAlpha(tse_tax,
+                    assay.type = "counts",
+                    index = c("shannon",
+                              "observed"))
+
+colData(tse_tax)$read_count <- colSums(assay(tse_tax,
+                                             "counts"))
+plotColData(tse_tax,
+            x = "read_count",
+            y = "observed") +
+  labs(x = "Reads with a taxonomic assignment",
+       y = "Observed taxa")
+```
+
+If samples with greater sequencing depth detect more taxa, differences in observed richness may reflect that sequencing depth rather than sample ecology. Relative abundances give us a tool for cross sample comparison that controls for differences in sequencing depth.
+
+## Composition
+
+```{r tax-composition}
+# agglomerate to phylum; keep reads with no phylum assignment
+tse_phylum <- agglomerateByRank(tse_tax,
+                                rank = "Phylum",
+                                empty.rm = FALSE)
+tse_phylum <- transformAssay(tse_phylum,
+                             assay.type = "counts",
+                             method = "relabundance")
+
+top_tax <- getTop(tse_phylum,
+                  top = 10,
+                  assay.type = "relabundance")
+
+# keep the top phyla, label unassigned reads, and group the rest as "Other"
+phylum <- rowData(tse_phylum)$Phylum
+phylum_label <- ifelse(is.na(phylum) | !nzchar(phylum),
+                       "Unassigned",
+                       ifelse(rownames(tse_phylum) %in% top_tax,
+                              phylum,
+                              "Other"))
+rowData(tse_phylum)$Phylum_top <- phylum_label
+
+tse_phylum_top <- agglomerateByVariable(tse_phylum,
+                                        by = "rows",
+                                        group = "Phylum_top")
+plotAbundance(tse_phylum_top,
+              assay.type = "relabundance",
+              order.row.by = "abund")
+```
+
+Stacked bar charts give us an idea of proportional differences between samples. However as stated before, the relative abundance is also useful to plot. These are often plotted on a log axis to make differences in relative abundance scales easier to observe.
+
+```{r tax-density}
+plotAbundanceDensity(tse_phylum,
+                     layout = "jitter",
+                     assay.type = "relabundance",
+                     n = 10) +
+  scale_x_log10()
+```
+
+## Between-sample differences
+
+```{r tax-ordination}
+tse_tax <- addMDS(tse_tax,
+                  assay.type = "relabundance",
+                  method = "bray",
+                  name = "MDS_bray")
+
+dominant_phylum <- getDominant(tse_tax,
+                               rank = "Phylum",
+                               complete = FALSE)
+colData(tse_tax)$dominant_phylum <- dominant_phylum[colnames(tse_tax)]
+
+plotReducedDim(tse_tax,
+               "MDS_bray",
+               colour_by = "dominant_phylum",
+               size_by = "shannon")
+plotScree(tse_tax,
+          "MDS_bray",
+          add.cumulative = TRUE) +
+  labs(x = "MDS axis",
+       y = "Eigenvalue")
+```
+
+```{r mds-variance, echo = FALSE}
+mds_coords <- reducedDim(tse_tax, "MDS_bray")
+mds_eig <- attr(mds_coords, "eig")
+if (is.null(mds_eig)) {
+  mds_eig <- attr(mds_coords, "varExplained")
+}
+if (is.null(mds_eig)) {
+  stop("No eigenvalues stored with the MDS_bray ordination.")
+}
+mds_percent <- round(100 * mds_eig / sum(mds_eig[mds_eig > 0]), 0)
+```
+
+So far we have described each sample on its own (alpha diversity). Ordination asks a different question: how do the samples relate to *each other* (beta diversity)?
+
+**Bray-Curtis dissimilarity** compares two samples' relative abundances, taxon by taxon. It is 0 when two samples have identical composition and 1 when they share no taxa. Because it works on abundances, it is driven mostly by the common taxa; a rare taxon that appears in only one sample barely moves it.
+
+**MDS** (also called principal coordinates analysis, PCoA) takes the table of all pairwise dissimilarities and places the samples in a few dimensions so that the distances on the plot approximate the Bray-Curtis values as closely as possible. A few rules for reading it:
+
+- **Distance is what matters.** Points close together have similar communities; points far apart differ.
+- **The axes have no units or biological meaning on their own.** They are simply the directions that capture the most variation, in decreasing order. The signs are arbitrary: a mirror image of the plot is equally correct.
+- **A 2D plot is a compromise.** The scree plot shows how much it leaves out.
+
+In our data, all six samples are dominated by Proteobacteria, which is common in sewage, so colouring by dominant phylum tells us very little. That is a useful result in itself: the differences between these samples lie in the balance of many taxa, not in which phylum is dominant. Shannon diversity is similar across these samples, but the sample in the lower right sits apart from the others *and* has the lowest diversity. That pattern would be worth following up in the sample metadata.
+
+On the scree plot, the left-hand axis is labelled "Proportion" but actually shows the raw eigenvalues; read the **cumulative** line against the right-hand axis instead. The first axis captures about `r mds_percent[1]`% of the between-sample variation and the second about `r mds_percent[2]`%, so the 2D plot shows roughly `r mds_percent[1] + mds_percent[2]`% of it. With six samples there can be at most five informative axes, which is why the last value is zero.
+
+With six samples from a single location, this plot describes variation; it cannot test differences between groups. If the metadata contained a grouping variable (a treatment or sampling date, for example), `getPERMANOVA()` would be the next step for testing whether it explains the differences.
+
+# Functional profiles
+
+MGnify predicts protein-coding sequences in each sample and annotates them with
+[InterProScan](https://www.ebi.ac.uk/interpro/). The three functional
+experiments are related views of the same annotations, at different resolutions:
+
+- **`interpro-identifiers`**: counts of predicted proteins matching each
+  InterPro entry (protein families, domains, and sites). This is the finest
+  resolution, with thousands of features.
+- **`go-terms`**: Gene Ontology terms mapped from those InterPro entries.
+  Each term belongs to one of three namespaces: biological process, molecular
+  function, or cellular component.
+- **`go-slim`**: a small, curated subset of broad GO terms that is much easier
+  to summarise and plot.
+
+Two things to keep in mind:
+
+1. A single protein can match several InterPro entries and map to several GO
+   terms. Functional counts are *annotation* counts, not read or gene counts,
+   so their totals aren't directly comparable with the taxonomy counts.
+2. Higher resolution means more features, more zeros, and noisier comparisons
+   between samples (see the summary table above).
+
+```{r functional-helpers}
+# readable labels: "description (accession)" when a description is available
+feature_labels <- function(x, max_chars = 60L) {
+  rd <- rowData(x)
+  desc_col <- intersect(c("description", "Description", "name"), colnames(rd))
+  if (length(desc_col) == 0L) {
+    return(rownames(x))
+  }
+  desc <- as.character(rd[[desc_col[1]]])
+  labels <- ifelse(is.na(desc) | !nzchar(desc),
+                   rownames(x),
+                   paste0(desc, " (", rownames(x), ")"))
+  too_long <- nchar(labels) > max_chars
+  labels[too_long] <- paste0(substr(labels[too_long], 1L, max_chars - 3L), "...")
+  make.unique(labels)
+}
+
+# which rowData column holds a feature description, or NA if none
+description_column <- function(x) {
+  found <- intersect(c("description", "Description", "name"),
+                     colnames(rowData(x)))
+  if (length(found) == 0L) NA_character_ else found[1]
+}
+
+tse_go_slim  <- transformAssay(tse_go_slim,  assay.type = "counts", method = "relabundance")
+tse_go_terms <- transformAssay(tse_go_terms, assay.type = "counts", method = "relabundance")
+tse_interpro <- transformAssay(tse_interpro, assay.type = "counts", method = "relabundance")
+```
+
+## Annotation depth and functional richness
+
+The same depth question we asked of taxonomy applies to function: does finding more distinct functions in a sample just mean it was sequenced more deeply?
+
+```{r interpro-depth}
+interpro_counts <- as.matrix(assay(tse_interpro, "counts"))
+# zeros are represented by NAs in this data, we need to fix that:
+# interpro_counts[is.na(interpro_counts)] <- 0
+interpro_depth <- data.frame(
+  sample = colnames(tse_interpro),
+  annotation_count = colSums(interpro_counts),
+  distinct_entries = colSums(interpro_counts > 0)
+)
+ggplot(interpro_depth,
+       aes(x = annotation_count, y = distinct_entries)) +
+  geom_point() +
+  labs(x = "InterPro annotations in sample",
+       y = "Distinct InterPro entries detected")
+```
+
+Each point is one sample. The x-axis is the total number of InterPro annotations, meaning how many predicted proteins matched an InterPro entry, counting a protein once for each entry it matches. The y-axis is the number of *different* InterPro entries found in that sample.
+
+Our samples range from roughly 0.8 to 1.8 million annotations, and from about 7,700 to just over 9,100 distinct entries. The shape matters more than the numbers. Distinct entries rise steeply across the shallower samples, then level off: the three deepest samples are within about 150 entries of each other, while the shallowest has around 1,400 fewer.
+
+This is a **saturation curve**, the functional equivalent of a rarefaction curve. Common functions are found almost immediately; rare ones only turn up as more of the community is sequenced. Once the curve flattens, extra sequencing adds little new, and the remaining differences between samples are more likely to be real. Below that point, depth and biology are mixed together.
+
+The practical consequence is that a lower count of distinct functions in a shallow sample isn't evidence that its community is less functionally diverse. To compare functional richness fairly you can subsample every sample to the same depth (`rarefyAssay()` in `mia`), compare relative abundances instead, or restrict comparisons to entries that are common enough to be detected at any depth (the prevalence filter we use for the heatmap below).
+
+## GO-slim: the broad functional picture
+
+GO-slim terms are deliberately broad. Each one stands in for a large part of the Gene Ontology, so a few dozen terms summarise thousands of specific GO annotations. Note that the list mixes all three GO branches: "nitrogen compound metabolic process" is a biological process, "nucleotide binding" a molecular function, and "membrane" a cellular component.
+
+The plot shows the 15 most abundant terms. Each point is one sample, placed at that term's share of the sample's GO-slim annotations.
+
+```{r go-slim-top}
+tse_go_slim_labelled <- tse_go_slim
+rownames(tse_go_slim_labelled) <- feature_labels(tse_go_slim)
+plotAbundanceDensity(tse_go_slim_labelled,
+                     layout = "jitter",
+                     assay.type = "relabundance",
+                     n = 15)
+```
+
+Two things stand out. First, the top terms are the broad machinery of cellular life: metabolism, biosynthesis, binding nucleotides and nucleic acids, transport. Nearly every bacterium carries genes for these, so they dominate any community.
+
+Second, the points for each term sit very close together. On the taxonomy ordination our six samples were clearly spread out, yet at this broad functional level they look almost identical. This is an early hint of **functional redundancy**: different mixes of organisms can carry out much the same overall set of functions. We test this more directly in the "Comparing taxonomic and functional views" section. The slightly wider spread for terms such as "membrane", "transport" and the oxidation-reduction terms shows where the small functional differences between these samples are concentrated.
+
+Three cautions:
+
+- **The shares overlap and shouldn't be added up.** GO is a hierarchy, and some of these terms are nested inside others. For example, DNA, RNA and protein metabolic processes all fall under "nitrogen compound metabolic process", so the same annotation can count towards several terms.
+- **High abundance doesn't mean importance.** Housekeeping functions dominate simply because every cell needs them. Interesting differences tend to be in less abundant terms.
+- **Annotations reflect the pipeline and GO version they were made with.** These analyses used MGnify pipeline version 2.0, which is several releases old. Some term names have changed since, and "oxidation-reduction process" (GO:0055114) has been made obsolete in current GO. Expect differences if you look these terms up on the GO website today.
+
+## GO terms by namespace
+
+Every GO term belongs to one of three branches, which GO calls *namespaces*:
+
+- **biological process**: what larger goal a gene product contributes to (for example, "DNA repair" or "nitrogen compound metabolic process");
+- **molecular function**: what the gene product does at the molecular level (for example, "ATP binding" or "hydrolase activity");
+- **cellular component**: where in the cell it acts (for example, "membrane" or "ribosome").
+
+MGnify stores the branch in the `lineage` column of `rowData()`. Summing counts within each branch shows how a sample's annotations divide across them. The first output also gives the fraction of all GO terms that were *not* detected in each sample.
+
+```{r go-namespaces}
+# give a proportion of how many GO-terms show up as NAs
+apply(X = assay(tse_go_terms),
+      FUN = function(x) {
+        sum(x == 0) / length(x)
+      },
+      MARGIN = 2)
+
+go_rd <- rowData(tse_go_terms)
+namespace_col <- intersect(c("lineage", "category", "namespace"), colnames(go_rd))
+
+if (length(namespace_col) == 0L) {
+  message("No GO namespace column found in rowData(tse_go_terms); ",
+          "available columns: ", paste(colnames(go_rd), collapse = ", "))
+} else {
+  namespace <- as.character(go_rd[[namespace_col[1]]])
+  rowData(tse_go_terms)$namespace <- ifelse(is.na(namespace) | !nzchar(namespace),
+                                            "unknown",
+                                            namespace)
+  tse_go_namespace <- agglomerateByVariable(tse_go_terms,
+                                            by = "rows",
+                                            group = "namespace")
+  tse_go_namespace <- transformAssay(tse_go_namespace,
+                                     assay.type = "counts",
+                                     method = "relabundance")
+  plotAbundance(tse_go_namespace,
+                assay.type = "relabundance")
+}
+```
+
+Between 12% and 24% of the GO terms in the dataset are absent from any one sample, a far less sparse table than InterPro.
+
+The branch proportions are almost identical in all six samples: roughly 55% molecular function, 35% biological process, and 10% cellular component. That stability tells us more about how annotation works than about the communities. GO terms here are assigned by mapping InterPro entries to GO, and most InterPro families and domains map naturally to a *molecular function* (a binding site or catalytic activity). Fewer map to a *cellular component*, partly because bacterial cells have few internal compartments to annotate.
+
+So treat this plot as a **sanity check** rather than a biological finding. Similar proportions across samples suggest they were annotated consistently. A sample that departed noticeably would more likely point to a difference in processing, such as a different pipeline version, than to a different community.
+
+As with GO-slim, these are *annotation* counts, not gene counts. A single protein can map to terms in more than one branch, so "55% molecular function" does not mean 55% of genes.
+
+## InterPro: the most prevalent families and domains
+
+With thousands of entries, we filter before plotting: keep entries found in at least half of the samples, then show the most abundant of those. The CLR transform is computed on *all* features first, then subset.
+
+```{r interpro-heatmap, fig.height = 7}
+tse_interpro <- transformAssay(tse_interpro,
+                               assay.type = "counts",
+                               method = "clr",
+                               pseudocount = TRUE)
+
+tse_interpro_prevalent <- subsetByPrevalent(tse_interpro,
+                                            assay.type = "relabundance",
+                                            detection = 0,
+                                            prevalence = 0.5)
+top_interpro <- getTop(tse_interpro_prevalent,
+                       top = 30,
+                       assay.type = "relabundance")
+
+heatmap_matrix <- assay(tse_interpro_prevalent, "clr")[top_interpro, , drop = FALSE]
+rownames(heatmap_matrix) <- feature_labels(tse_interpro_prevalent[top_interpro, ])
+heatmap_matrix <- heatmap_matrix[apply(heatmap_matrix, 1, sd) > 0, , drop = FALSE]
+heatmap_matrix <- t(scale(t(heatmap_matrix)))
+
+ComplexHeatmap::Heatmap(heatmap_matrix,
+                        name = "CLR z-score",
+                        row_names_gp = grid::gpar(fontsize = 7),
+                        column_names_gp = grid::gpar(fontsize = 8))
+```
+
+Colour shows whether an entry is relatively high or low *in that sample compared with its own average*, not whether it is abundant overall.
+
+## Asking a targeted question: resistance-associated protein families
+
+Searching InterPro descriptions lets us ask focused questions. Here we look for protein families whose names suggest antibiotic resistance:
+
+```{r interpro-keywords}
+desc_col <- description_column(tse_interpro)
+
+if (is.na(desc_col)) {
+  message("No description column in rowData(tse_interpro); skipping keyword search.")
+} else {
+  descriptions <- tolower(as.character(rowData(tse_interpro)[[desc_col]]))
+  descriptions[is.na(descriptions)] <- ""
+  keywords <- c("beta-lactamase", "tetracycline", "vancomycin",
+                "aminoglycoside", "multidrug efflux")
+  relabundance <- as.matrix(assay(tse_interpro, "relabundance"))
+
+  keyword_results <- do.call(rbind, lapply(keywords, function(keyword) {
+    matches <- grepl(keyword, descriptions, fixed = TRUE)
+    data.frame(keyword = keyword,
+               sample = colnames(relabundance),
+               entries_matched = sum(matches),
+               proportion = if (any(matches)) {
+                 colSums(relabundance[matches, , drop = FALSE])
+               } else {
+                 rep(0, ncol(relabundance))
+               })
+  }))
+
+  print(unique(keyword_results[, c("keyword", "entries_matched")]))
+
+  ggplot(keyword_results,
+         aes(x = keyword, y = proportion)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(width = 0.15) +
+    coord_flip() +
+    labs(x = NULL,
+         y = "Share of InterPro annotations")
+}
+```
+
+Treat this as exploration, not resistance-gene detection. A name match is only
+a proxy: the "metallo-beta-lactamase" superfamily, for example, contains many
+enzymes that have nothing to do with antibiotics. Dedicated resources such as
+[CARD](https://card.mcmaster.ca/) or AMRFinderPlus are needed before making
+claims about resistance genes.
+
+# Comparing taxonomic and functional views
+
+How different do the samples look depending on which features we describe them
+by? We compare pairwise Bray-Curtis dissimilarities across all the views, using
+only samples present in every experiment.
+
+```{r resolution-comparison}
+shared_samples <- Reduce(intersect, list(colnames(tse_tax),
+                                         colnames(tse_go_slim),
+                                         colnames(tse_go_terms),
+                                         colnames(tse_interpro)))
+n_shared <- length(shared_samples)
+message("Samples present in every experiment: ", n_shared)
+if (n_shared < 3L) {
+  stop("Too few shared samples to compare dissimilarities.")
+}
+
+pairwise_bray <- function(x, label) {
+  d <- getDissimilarity(x[, shared_samples],
+                        assay.type = "relabundance",
+                        method = "bray")
+  data.frame(profile = label, bray = as.vector(d))
+}
+
+dissimilarities <- rbind(
+  pairwise_bray(tse_phylum, "Taxonomy: phylum"),
+  pairwise_bray(tse_tax, "Taxonomy: all taxa"),
+  pairwise_bray(tse_go_slim, "Function: GO-slim"),
+  pairwise_bray(tse_go_terms, "Function: GO terms"),
+  pairwise_bray(tse_interpro, "Function: InterPro")
+)
+dissimilarities$profile <- factor(dissimilarities$profile,
+                                  levels = unique(dissimilarities$profile))
+
+ggplot(dissimilarities,
+       aes(x = profile, y = bray)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.6) +
+  coord_flip() +
+  labs(x = NULL,
+       y = "Pairwise Bray-Curtis dissimilarity")
+```
+
+Two things usually show up here:
+
+1. **Resolution matters.** Finer features (all taxa, InterPro) make samples
+   look more different than coarse ones (phylum, GO-slim).
+2. **Function is often more stable than taxonomy.** Different organisms can
+   carry out the same functions, a property called *functional redundancy*.
+   Compare views at *similar* resolution (phylum against GO-slim) before
+   drawing that conclusion.
+
+Do samples that are taxonomically similar also tend to be functionally
+similar? A Mantel test compares the two dissimilarity matrices:
+
+```{r mantel, eval = n_shared >= 5}
+d_taxonomy <- getDissimilarity(tse_phylum[, shared_samples],
+                               assay.type = "relabundance",
+                               method = "bray")
+d_function <- getDissimilarity(tse_go_slim[, shared_samples],
+                               assay.type = "relabundance",
+                               method = "bray")
+vegan::mantel(d_taxonomy,
+              d_function,
+              method = "spearman",
+              permutations = 999)
+```
+
+With very few samples there are only a handful of distinct permutations, so
+the p-value is coarse. Read it as a description of these samples, not a
+general result.
+
+## Which taxa track which functions?
+
+```{r cross-association, fig.height = 6}
+tse_genus <- agglomerateByRank(getWithColData(x = mse,
+                                              i = "Taxonomic analysis"),
+                               rank = "Genus")
+tse_genus <- transformAssay(tse_genus,
+                            assay.type = "counts",
+                            method = "relabundance")
+tse_genus <- transformAssay(tse_genus,
+                            assay.type = "counts",
+                            method = "clr",
+                            pseudocount = TRUE)
+go_slim_shared <- transformAssay(tse_go_slim[, shared_samples],
+                                 assay.type = "counts",
+                                 method = "clr",
+                                 pseudocount = TRUE)
+
+top_genus <- getTop(tse_genus, top = 15, assay.type = "relabundance")
+top_go_slim <- getTop(go_slim_shared, top = 15, assay.type = "relabundance")
+
+go_slim_top <- go_slim_shared[top_go_slim, ]
+rownames(go_slim_top) <- feature_labels(go_slim_top, max_chars = 40L)
+
+mae_small <- MultiAssayExperiment(
+  experiments = ExperimentList(genus = tse_genus[top_genus, ],
+                               go_slim = go_slim_top)
+)
+associations <- getCrossAssociation(mae_small,
+                                    experiment1 = "genus",
+                                    experiment2 = "go_slim",
+                                    assay.type1 = "clr",
+                                    assay.type2 = "clr",
+                                    method = "spearman",
+                                    mode = "matrix",
+                                    test.signif = TRUE,
+                                    p.adj.method = "fdr")
+
+ComplexHeatmap::Heatmap(associations$cor,
+                        name = "Spearman",
+                        row_names_gp = grid::gpar(fontsize = 7),
+                        column_names_gp = grid::gpar(fontsize = 7))
+```
+
+With few samples, strong correlations appear easily by chance. Treat this as
+hypothesis generation, and check the adjusted p-values in
+`associations$p_adj` before reading anything into a single cell.
+
+# Exercises
+
+1. Check `MGnify` for other accessions that might be interesting (unique or diverse sample sets)
+2. Look through `colnames(colData(mse))`. Is there a collection date or other variable you could colour the ordination by?
+3. Pick an InterPro entry from the heatmap and look it up on the [InterPro website](https://www.ebi.ac.uk/interpro/). What does it do?
+4. Add another keyword to the targeted search. How many entries does it match, and do you trust all of them?
+5. Change `prevalence = 0.5` in the InterPro filter to `0.9`. How many entries survive, and what does that tell you about the "core" functions of these samples?
+
+# Session information
+
+```{r session-info}
+sessionInfo()
+```
+
