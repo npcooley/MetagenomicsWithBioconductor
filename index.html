@@ -45,18 +45,6 @@
 <li>
   <a href="reference/index.html">Reference</a>
 </li>
-<li class="dropdown">
-  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    Articles
-
-    <span class="caret"></span>
-  </a>
-  <ul class="dropdown-menu" role="menu">
-<li>
-      <a href="articles/workshop_example.html">An Example Workshop</a>
-    </li>
-  </ul>
-</li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
 <li>
@@ -78,99 +66,95 @@
       </header><div class="row">
   <div class="contents col-md-9">
 <div class="section level1">
-<div class="page-header"><h1 id="buildabiocworkshop">BuildABiocWorkshop<a class="anchor" aria-label="anchor" href="#buildabiocworkshop"></a>
+<div class="page-header"><h1 id="metagenomics-with-bioconductor">Metagenomics with Bioconductor<a class="anchor" aria-label="anchor" href="#metagenomics-with-bioconductor"></a>
 </h1></div>
-<p>This package is a template for building a Bioconductor workshop. The package includes Github actions to:</p>
-<ol style="list-style-type: decimal">
-<li>Set up bioconductor/bioconductor_docker:devel on Github resources</li>
-<li>Install package dependencies for your package (based on the <code>DESCRIPTION</code> file)</li>
-<li>Run <code><a href="http://r-lib.github.io/rcmdcheck/reference/rcmdcheck.html" class="external-link">rcmdcheck::rcmdcheck</a></code>
-</li>
-<li>Build a pkgdown website and push it to github pages</li>
-<li>Build a docker image with the installed package and dependencies and deploy to <a href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#pulling-container-images" class="external-link">the Github Container Repository</a> at the name <code>ghcr.io/gihub_user/repo_name</code>, all lowercase.</li>
-</ol>
-<div class="section level2">
-<h2 id="responsibilities">Responsibilities<a class="anchor" aria-label="anchor" href="#responsibilities"></a>
-</h2>
-<p>Package authors are primarily responsible for:</p>
-<ol style="list-style-type: decimal">
-<li>Creating a landing site of their choosing for their workshops (a website). This website should be listed in the <code>DESCRIPTION</code> file as the <code>URL</code>.</li>
-<li>Creating a docker image that will contain workshop materials and the installed packages necessary to run those materials. The name of the resulting docker image, including “tag” if desired, should be listed in a non-standard tag, <code>DockerImage:</code> in the <code>DESCRIPTION</code> file.</li>
-</ol>
-<p>Both of those tasks can be accomplished using the Github actions included in this template package. The vignette accompanying this package describes how to accomplish both of these tasks.</p>
-</div>
-<div class="section level2">
-<h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a>
-</h2>
-<p>For detailed instructions, see the <code>How to build a workshop</code> article/vignette.</p>
-</div>
-<div class="section level2">
-<h2 id="results-of-successful-deployment">Results of successful deployment<a class="anchor" aria-label="anchor" href="#results-of-successful-deployment"></a>
-</h2>
+<p>Nicholas Cooley 2026-10-18</p>
 <ul>
-<li>A working docker image that contains the installed package and dependencies.</li>
-<li>An up-to-date <code>pkgdown</code> website at <a href="https://YOURUSERNAME.github.io/YOURREPOSITORYNAME/" class="external-link uri">https://YOURUSERNAME.github.io/YOURREPOSITORYNAME/</a>
-</li>
-<li>Docker image will be tagged with <code>latest</code>, <code>sha-XXXXXX</code> where <code>XXXXXX</code> is the hash of the current <code>master</code> commit, and <code>master</code>.</li>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#workshop-information">Workshop information</a></li>
+<li><a href="#general">General</a></li>
 </ul>
+<div class="section level2">
+<h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
+</h2>
+<p>Bioconductor has tools for working with metagenomic data. This workshop is designed to introduce those tools to data science students who have a strong background in informatics generally and R, but may not have a background in computational biology.</p>
 </div>
 <div class="section level2">
-<h2 id="warning-important-make-your-docker-image-public-on-ghcr">⚠️ IMPORTANT: Make Your Docker Image Public on GHCR<a class="anchor" aria-label="anchor" href="#warning-important-make-your-docker-image-public-on-ghcr"></a>
+<h2 id="workshop-information">Workshop information<a class="anchor" aria-label="anchor" href="#workshop-information"></a>
 </h2>
-<blockquote>
-<p><strong>Your workshop Docker image will NOT be publicly accessible by default.</strong></p>
-<p>GitHub Container Registry (GHCR) sets all newly pushed packages to <strong>private</strong> visibility automatically. This means that anyone trying to pull your workshop image — attendees, workshop organizers, automated systems — <strong>will get an authentication error</strong> unless you explicitly change the visibility to <strong>public</strong>.</p>
-<p>This is a manual step that <strong>cannot be automated</strong> through the GitHub Actions workflow in this template, because changing package visibility requires owner-level permissions that exceed what the <code>GITHUB_TOKEN</code> secret can provide.</p>
-</blockquote>
-<div class="section level3">
-<h3 id="how-to-make-your-image-public">How to make your image public<a class="anchor" aria-label="anchor" href="#how-to-make-your-image-public"></a>
-</h3>
-<p>After GitHub Actions successfully pushes your Docker image for the first time:</p>
-<ol style="list-style-type: decimal">
-<li>Go to your GitHub profile or organization page</li>
-<li>Click the <strong>“Packages”</strong> tab</li>
-<li>Find your workshop package (it will be named after your repository)</li>
-<li>Click the package name to open it</li>
-<li>Click <strong>“Package settings”</strong> (bottom right of the package page)</li>
-<li>Scroll down to the <strong>“Danger Zone”</strong> section</li>
-<li>Click <strong>“Change visibility”</strong> → select <strong>Public</strong> → confirm</li>
-</ol>
-<p>Alternatively, navigate directly to:</p>
-<pre><code>https://github.com/users/YOUR_USERNAME/packages/container/YOUR_REPO_NAME/settings</code></pre>
-<p>(or for organizations: <code>https://github.com/orgs/YOUR_ORG/packages/container/YOUR_REPO_NAME/settings</code>)</p>
-</div>
-<div class="section level3">
-<h3 id="why-does-this-matter">Why does this matter?<a class="anchor" aria-label="anchor" href="#why-does-this-matter"></a>
-</h3>
-<p>Bioconductor workshops are meant to be open and reproducible. Attendees need to be able to <code>docker pull</code> your image <strong>without</strong> a GitHub account or any authentication. A private image silently breaks this for everyone. <strong>Make the image public before advertising your workshop.</strong></p>
-</div>
-<div class="section level3">
-<h3 id="relevant-documentation">Relevant documentation<a class="anchor" aria-label="anchor" href="#relevant-documentation"></a>
-</h3>
+<p><strong>Learning goals.</strong> By the end of this workshop you should be able to:</p>
 <ul>
-<li><a href="https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility" class="external-link">GitHub Docs: Configuring a package’s access control and visibility</a></li>
-<li><a href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry" class="external-link">GitHub Docs: Working with the Container Registry</a></li>
-<li><a href="https://docs.github.com/en/packages/learn-github-packages/connecting-a-repository-to-a-package" class="external-link">GitHub Docs: Connecting a repository to a package</a></li>
+<li>describe how MGnify results are organised in a <code>MultiAssayExperiment</code>;</li>
+<li>explore taxonomic composition, diversity, and between-sample differences;</li>
+<li>explore functional profiles (GO-slim, GO terms, InterPro) and explain why their resolution matters;</li>
+<li>compare taxonomic and functional views of the same samples.</li>
 </ul>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="to-use-the-resulting-image">To use the resulting image:<a class="anchor" aria-label="anchor" href="#to-use-the-resulting-image"></a>
-</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">-e</span> PASSWORD=<span class="op">&lt;</span>choose_a_password_for_rstudio<span class="op">&gt;</span> -p 8787:8787 YOURDOCKERIMAGENAME</span></code></pre></div>
-<p>Once running, navigate to <a href="http://localhost:8787/" class="external-link uri">http://localhost:8787/</a> and then login with <code>rstudio</code>:<code>yourchosenpassword</code>.</p>
-<p>To try with <strong>this</strong> repository docker image:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">-e</span> PASSWORD=abc <span class="at">-p</span> 8787:8787 ghcr.io/bioconductor/buildabiocworkshop</span></code></pre></div>
-<p><em>NOTE</em>: Running docker that uses the password in plain text like above exposes the password to others in a multi-user system (like a shared workstation or compute node). In practice, consider using an environment variable instead of plain text to pass along passwords and other secrets in docker command lines.</p>
+<p><strong>Prerequisites.</strong> Basic R; some familiarity with <code>SummarizedExperiment</code>-style objects is helpful but not required.</p>
+<p><strong>Packages used.</strong> <code>MGnifyR</code>, <code>MultiAssayExperiment</code>, <code>TreeSummarizedExperiment</code>, <code>mia</code>, <code>miaViz</code>, <code>scater</code>, <code>ComplexHeatmap</code>, <code>vegan</code>, <code>ggplot2</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="whatcha-get">Whatcha get<a class="anchor" aria-label="anchor" href="#whatcha-get"></a>
+<h2 id="general">General<a class="anchor" aria-label="anchor" href="#general"></a>
 </h2>
+<p>A full end-to-end metagenomics experiment would include:</p>
 <ul>
-<li><a href="https://bioconductor.github.io/BuildABiocWorkshop" class="external-link uri">https://bioconductor.github.io/BuildABiocWorkshop</a></li>
-<li>A Docker image that you can run locally, in the cloud, or (usually) even as a singularity container on HPC systems.</li>
+<li>sample collection</li>
+<li>sample preparation</li>
+<li>sequencing</li>
+<li>quality control</li>
+<li>assembly</li>
+<li>taxonomic and functional assignments</li>
+<li>informatics analysis</li>
 </ul>
+<p>This workshop will cover only the last step. Though the brief discussion of <code>MGnify</code> analysis pipeline versions refers to the second to last step.</p>
+<p>The following code snippet is included in the workshop, but the data generated by it is cached with the workshop. So participants don’t need to run this specifically themselves.</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/EBI-Metagenomics/MGnifyR" class="external-link">MGnifyR</a></span><span class="op">)</span></span>
+<span><span class="co"># increase R's default timeout limit of server calls, just because</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>timeout <span class="op">=</span> <span class="fl">600</span><span class="op">)</span></span>
+<span><span class="co"># use a cache in R's temp directory</span></span>
+<span><span class="va">mg</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/MGnifyR/man/MgnifyClient.html" class="external-link">MgnifyClient</a></span><span class="op">(</span>useCache <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>                   cacheDir <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                                        <span class="st">"MGnifyR_cache"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># danish waste water collection study from copenhagen</span></span>
+<span><span class="va">study_id</span> <span class="op">&lt;-</span> <span class="st">"MGYS00001135"</span></span>
+<span></span>
+<span><span class="va">analysis_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/MGnifyR/man/searchAnalysis.html" class="external-link">searchAnalysis</a></span><span class="op">(</span><span class="va">mg</span>, <span class="st">"studies"</span>, <span class="va">study_id</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># if you haven't changed R's default timeout option, this may complain</span></span>
+<span><span class="va">analysis_meta_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/MGnifyR/man/getMetadata.html" class="external-link">getMetadata</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">mg</span>,</span>
+<span>                                  accession <span class="op">=</span> <span class="va">analysis_ids</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># this is an idiomatic call to tapply; without specifying `FUN`</span></span>
+<span><span class="co"># tapply will return integer ids for the shared factor combinations,</span></span>
+<span><span class="co"># in this case, latitute and longitude</span></span>
+<span><span class="co"># it can contain NAs when NAs are present in a supplied INDEX</span></span>
+<span><span class="va">sample_locations</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/tapply.html" class="external-link">tapply</a></span><span class="op">(</span>X <span class="op">=</span> <span class="va">analysis_meta_data</span>,</span>
+<span>                           INDEX <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">analysis_meta_data</span><span class="op">$</span><span class="va">`sample_geographic location (longitude)`</span>,</span>
+<span>                                        <span class="va">analysis_meta_data</span><span class="op">$</span><span class="va">`sample_geographic location (latitude)`</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># metadata can be messy, we know ahead of time that this data can contain NAs,</span></span>
+<span><span class="co"># but this is a form you would use to check if you didn't</span></span>
+<span><span class="co"># know that ahead of time</span></span>
+<span><span class="co"># any(is.na(analysis_meta_data$`sample_geographic location (latitude)`))</span></span>
+<span><span class="co"># any(is.na(analysis_meta_data$`sample_geographic location (longitude)`))</span></span>
+<span></span>
+<span><span class="co"># we want to select the sampling location with the fewest samples, for simplicity</span></span>
+<span><span class="co"># table the sample location index, find the lowest value, get the name</span></span>
+<span><span class="co"># that in this case is just an integer</span></span>
+<span><span class="va">w1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/which.min.html" class="external-link">which.min</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">sample_locations</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># which() manages NAs for us</span></span>
+<span><span class="va">analysis_subset</span> <span class="op">&lt;-</span> <span class="va">analysis_meta_data</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">sample_locations</span> <span class="op">==</span> <span class="va">w1</span><span class="op">)</span>, <span class="op">]</span></span>
+<span></span>
+<span><span class="co"># getting a single tree summarized experiment</span></span>
+<span><span class="va">tse</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/MGnifyR/man/getResult.html" class="external-link">getResult</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">mg</span>,</span>
+<span>                 accession <span class="op">=</span> <span class="va">analysis_subset</span><span class="op">[[</span><span class="st">"analysis_accession"</span><span class="op">]</span><span class="op">]</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span>,</span>
+<span>                 get.func <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># getting a multiassayexperiment containing the tses for several accessions</span></span>
+<span><span class="va">mse</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/MGnifyR/man/getResult.html" class="external-link">getResult</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">mg</span>,</span>
+<span>                 accession <span class="op">=</span> <span class="va">analysis_subset</span><span class="op">[[</span><span class="st">"analysis_accession"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
   </div>
