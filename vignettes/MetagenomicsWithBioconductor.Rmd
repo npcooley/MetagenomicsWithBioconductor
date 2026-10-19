@@ -131,6 +131,10 @@ get_json <- function(path) {
 study <- get_json(paste0("studies/",
                          STUDY))
 
+# get a subset of the study analyses
+batch <- get_json(paste0("studies/", STUDY, "/analyses/?page=1&page_size=20"))
+analyses <- as.data.frame(batch$items)
+
 ANALYSIS <- analyses$accession[1]
 analysis <- get_json(paste0("analyses/",
                             ANALYSIS))
