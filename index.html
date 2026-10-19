@@ -68,10 +68,11 @@
 <div class="section level1">
 <div class="page-header"><h1 id="metagenomics-with-bioconductor">Metagenomics with Bioconductor<a class="anchor" aria-label="anchor" href="#metagenomics-with-bioconductor"></a>
 </h1></div>
-<p>Nicholas Cooley 2026-10-18</p>
+<p>Nicholas Cooley 2026-10-19</p>
 <ul>
 <li><a href="#introduction">Introduction</a></li>
 <li><a href="#workshop-information">Workshop information</a></li>
+<li><a href="#setup">Setup</a></li>
 <li><a href="#general">General</a></li>
 </ul>
 <div class="section level2">
@@ -90,7 +91,107 @@
 <li>compare taxonomic and functional views of the same samples.</li>
 </ul>
 <p><strong>Prerequisites.</strong> Basic R; some familiarity with <code>SummarizedExperiment</code>-style objects is helpful but not required.</p>
-<p><strong>Packages used.</strong> <code>MGnifyR</code>, <code>MultiAssayExperiment</code>, <code>TreeSummarizedExperiment</code>, <code>mia</code>, <code>miaViz</code>, <code>scater</code>, <code>ComplexHeatmap</code>, <code>vegan</code>, <code>ggplot2</code>.</p>
+<p><strong>Packages used.</strong> <code>MGnifyR</code>, <code>MultiAssayExperiment</code>, <code>TreeSummarizedExperiment</code>, <code>mia</code>, <code>miaViz</code>, <code>scater</code>, <code>UpSetR</code>, <code>ComplexHeatmap</code>, <code>vegan</code>, <code>ggplot2</code>.</p>
+</div>
+<div class="section level2">
+<h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
+</h2>
+<p>You can participate using Orchestra in your browser or R on your own computer. You only need to choose one option.</p>
+<div class="section level3">
+<h3 id="option-1-use-orchestra-in-your-browser">Option 1: Use Orchestra in your browser<a class="anchor" aria-label="anchor" href="#option-1-use-orchestra-in-your-browser"></a>
+</h3>
+<p>An Orchestra environment is being prepared for this workshop. The organisers will confirm when it is available and provide the template name.</p>
+<p>Once available:</p>
+<ol style="list-style-type: decimal">
+<li>Go to <a href="https://app.orchestraplatform.org/templates" class="external-link">Orchestra workshop templates</a> and sign in with your Google account.</li>
+<li>Find the metagenomics workshop template.</li>
+<li>Click <strong>Launch</strong> to start your workshop session.</li>
+</ol>
+<p>The environment will include the required packages and data. You will not need to install R or RStudio on your computer or run the local installation instructions below.</p>
+</div>
+<div class="section level3">
+<h3 id="option-2-use-r-on-your-own-computer">Option 2: Use R on your own computer<a class="anchor" aria-label="anchor" href="#option-2-use-r-on-your-own-computer"></a>
+</h3>
+<p>Please complete these steps before the workshop, as installing the packages can take some time.</p>
+<p>Use R 4.6.x and a recent version of RStudio. These instructions use Bioconductor release 3.23, the same version as the single-cell workshop.</p>
+<p>Run each section below in order in the R console.</p>
+<div class="section level4">
+<h4 id="id_1-install-the-workshop-package-and-its-dependencies">1. Install the workshop package and its dependencies<a class="anchor" aria-label="anchor" href="#id_1-install-the-workshop-package-and-its-dependencies"></a>
+</h4>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co">## Check R version</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric_version.html" class="external-link">getRversion</a></span><span class="op">(</span><span class="op">)</span> <span class="op">&lt;</span> <span class="st">"4.6.0"</span><span class="op">)</span></span>
+<span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span></span>
+<span>    <span class="st">"This workshop needs R 4.6.0 or later (you have "</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/numeric_version.html" class="external-link">getRversion</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"). Please update R and re-run."</span></span>
+<span>  <span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Install BiocManager</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://bioconductor.github.io/BiocManager/" class="external-link">"BiocManager"</a></span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Use Bioconductor release 3.23</span></span>
+<span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/install.html" class="external-link">install</a></span><span class="op">(</span>version <span class="op">=</span> <span class="st">"3.23"</span>, ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>repos <span class="op">=</span> <span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/repositories.html" class="external-link">repositories</a></span><span class="op">(</span>version <span class="op">=</span> <span class="st">"3.23"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Install remotes and usethis</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"remotes"</span>, <span class="st">"usethis"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Install the workshop package, dependencies and bundled data</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span></span>
+<span>  <span class="st">"npcooley/MetagenomicsWithBioconductor@devel"</span>,</span>
+<span>  dependencies <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  upgrade <span class="op">=</span> <span class="st">"always"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Here, <code>@devel</code> refers to the workshop repository’s branch, not the development version of Bioconductor. The instructions above select Bioconductor release 3.23.</p>
+</div>
+<div class="section level4">
+<h4 id="id_2-download-the-workshop-notebooks">2. Download the workshop notebooks<a class="anchor" aria-label="anchor" href="#id_2-download-the-workshop-notebooks"></a>
+</h4>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">usethis</span><span class="fu">::</span><span class="fu"><a href="https://usethis.r-lib.org/reference/zip-utils.html" class="external-link">use_course</a></span><span class="op">(</span></span>
+<span>  <span class="st">"https://github.com/npcooley/MetagenomicsWithBioconductor/archive/refs/heads/devel.zip"</span>,</span>
+<span>  destdir <span class="op">=</span> <span class="st">"~"</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Answer any prompts before continuing. The workshop notebook is <code>vignettes/MetagenomicsWithBioconductor.Rmd</code> in the downloaded project.</p>
+</div>
+<div class="section level4">
+<h4 id="id_3-check-that-the-packages-and-data-load">3. Check that the packages and data load<a class="anchor" aria-label="anchor" href="#id_3-check-that-the-packages-and-data-load"></a>
+</h4>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co">## Load the packages used in the workshop</span></span>
+<span><span class="va">pkgs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"MGnifyR"</span>,</span>
+<span>  <span class="st">"MultiAssayExperiment"</span>,</span>
+<span>  <span class="st">"TreeSummarizedExperiment"</span>,</span>
+<span>  <span class="st">"mia"</span>,</span>
+<span>  <span class="st">"miaViz"</span>,</span>
+<span>  <span class="st">"scater"</span>,</span>
+<span>  <span class="st">"UpSetR"</span>,</span>
+<span>  <span class="st">"ComplexHeatmap"</span>,</span>
+<span>  <span class="st">"vegan"</span>,</span>
+<span>  <span class="st">"ggplot2"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/invisible.html" class="external-link">invisible</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">pkgs</span>, <span class="va">library</span>, character.only <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Load the bundled workshop data</span></span>
+<span><span class="va">data_path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span></span>
+<span>  <span class="st">"extdata"</span>, <span class="st">"workshop_data.RData"</span>,</span>
+<span>  package <span class="op">=</span> <span class="st">"MetagenomicsWithBioconductor"</span>,</span>
+<span>  mustWork <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/load.html" class="external-link">load</a></span><span class="op">(</span><span class="va">data_path</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Inspect the available experiments</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">mse</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co">## Check the Bioconductor installation</span></span>
+<span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/valid.html" class="external-link">valid</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>The data-loading step should load objects called <code>tse</code> and <code>mse</code>. The <code>names(mse)</code> command should list four experiments: <code>Taxonomic analysis</code>, <code>go-slim</code>, <code>go-terms</code> and <code>interpro-identifiers</code>.</p>
+<p>The final check should return <code>TRUE</code>. If you get an error or a report of incompatible packages, share the output with the organisers.</p>
+<p>The data are included in the workshop package. You do not need to run the MGnify download examples. For the hands-on analysis, start at <strong>Exploring the data</strong> in the <a href="https://npcooley.github.io/MetagenomicsWithBioconductor/articles/MetagenomicsWithBioconductor.html">workshop materials</a>.</p>
+</div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="general">General<a class="anchor" aria-label="anchor" href="#general"></a>
@@ -105,9 +206,9 @@
 <li>taxonomic and functional assignments</li>
 <li>informatics analysis</li>
 </ul>
-<p>This workshop will cover only the last step. Though the brief discussion of <code>MGnify</code> analysis pipeline versions refers to the second to last step.</p>
-<p>The following code snippet is included in the workshop, but the data generated by it is cached with the workshop. So participants don’t need to run this specifically themselves.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<p>This workshop will cover only the last step. The brief discussion of <code>MGnify</code> analysis pipeline versions refers to the second-to-last step.</p>
+<p>The following code shows how the workshop data were retrieved. The data are already included in the workshop package, so participants do not need to run this code.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/EBI-Metagenomics/MGnifyR" class="external-link">MGnifyR</a></span><span class="op">)</span></span>
 <span><span class="co"># increase R's default timeout limit of server calls, just because</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>timeout <span class="op">=</span> <span class="fl">600</span><span class="op">)</span></span>
@@ -127,7 +228,7 @@
 <span></span>
 <span><span class="co"># this is an idiomatic call to tapply; without specifying `FUN`</span></span>
 <span><span class="co"># tapply will return integer ids for the shared factor combinations,</span></span>
-<span><span class="co"># in this case, latitute and longitude</span></span>
+<span><span class="co"># in this case, latitude and longitude</span></span>
 <span><span class="co"># it can contain NAs when NAs are present in a supplied INDEX</span></span>
 <span><span class="va">sample_locations</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/BiocGenerics/man/tapply.html" class="external-link">tapply</a></span><span class="op">(</span>X <span class="op">=</span> <span class="va">analysis_meta_data</span>,</span>
 <span>                           INDEX <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">analysis_meta_data</span><span class="op">$</span><span class="va">`sample_geographic location (longitude)`</span>,</span>

@@ -3,7 +3,7 @@ pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   MetagenomicsWithBioconductor: MetagenomicsWithBioconductor.html
-last_built: 2026-10-19T13:24Z
+last_built: 2026-10-19T13:55Z
 urls:
   reference: https://npcooley.github.io/MetagenomicsWithBioconductor/reference
   article: https://npcooley.github.io/MetagenomicsWithBioconductor/articles
