@@ -1,4 +1,5 @@
 ^LICENSE\.md$
+^vignettes\.html$
 .github
 Dockerfile
 _pkgdown.yml

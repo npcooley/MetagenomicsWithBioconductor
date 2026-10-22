@@ -8,7 +8,7 @@ env:
 jobs:
   r-build-and-check:
     runs-on: ubuntu-latest
-    container: bioconductor/bioconductor_docker:devel
+    container: bioconductor/bioconductor_docker:RELEASE_3_23
 
     env:
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: TRUE
@@ -22,7 +22,7 @@ jobs:
       - name: Query dependencies and update old packages
         run: |
           options(repos = c(CRAN = Sys.getenv("CRAN")))
-          BiocManager::install(c("remotes", "rcmdcheck"), ask = FALSE)
+          BiocManager::install(c("remotes", "rcmdcheck"), ask = FALSE, version = '3.23')
           saveRDS(remotes::dev_package_deps(dependencies = TRUE), ".github/depends.Rds", version = 2)
         shell: Rscript {0}
         
@@ -37,8 +37,8 @@ jobs:
       - name: Install dependencies
         run: |
           options(repos = c(CRAN = Sys.getenv("CRAN")))
-          remotes::install_deps(dependencies = TRUE, repos = BiocManager::repositories())
-          BiocManager::install(ask = FALSE, update = TRUE)
+          remotes::install_deps(dependencies = TRUE, repos = BiocManager::repositories(version = "3.23"))
+          BiocManager::install(ask = FALSE, update = TRUE, version = "3.23")
         shell: Rscript {0}
 
       - name: Check
